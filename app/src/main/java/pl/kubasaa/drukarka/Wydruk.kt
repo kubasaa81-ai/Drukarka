@@ -247,6 +247,36 @@ object Wydruk {
         }, a)
     }
 
+    /** Kilka stron (np. kartki A4 ze zdjęciami) przez okno systemowe. rysuj(płótno, szer, wys, jednostek/mm, strona). */
+    fun systemowoStrony(c: Context, ileStron: Int, nazwa: String, rysuj: (Canvas, Float, Float, Float, Int) -> Unit) {
+        val pm = c.getSystemService(Context.PRINT_SERVICE) as PrintManager
+        val a = PrintAttributes.Builder()
+            .setColorMode(PrintAttributes.COLOR_MODE_COLOR)
+            .setMinMargins(PrintAttributes.Margins.NO_MARGINS)
+            .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
+            .build()
+        pm.print(nazwa, object : PrintDocumentAdapter() {
+            var atr: PrintAttributes? = null
+            override fun onLayout(stare: PrintAttributes?, nowe: PrintAttributes, cs: CancellationSignal?, cb: PrintDocumentAdapter.LayoutResultCallback, extras: Bundle?) {
+                atr = nowe
+                cb.onLayoutFinished(PrintDocumentInfo.Builder(nazwa).setContentType(PrintDocumentInfo.CONTENT_TYPE_PHOTO).setPageCount(ileStron).build(), true)
+            }
+            override fun onWrite(strony: Array<out PageRange>?, cel: ParcelFileDescriptor, cs: CancellationSignal?, cb: PrintDocumentAdapter.WriteResultCallback) {
+                try {
+                    val doc = PrintedPdfDocument(c, atr ?: a)
+                    for (i in 0 until ileStron) {
+                        val s = doc.startPage(i)
+                        rysuj(s.canvas, s.info.pageWidth.toFloat(), s.info.pageHeight.toFloat(), (72 / 25.4).toFloat(), i)
+                        doc.finishPage(s)
+                    }
+                    FileOutputStream(cel.fileDescriptor).use { doc.writeTo(it) }
+                    doc.close()
+                    cb.onWriteFinished(arrayOf(PageRange.ALL_PAGES))
+                } catch (e: Exception) { cb.onWriteFailed(e.message) }
+            }
+        }, a)
+    }
+
     private fun mediaAndroid(a: Double, b: Double): PrintAttributes.MediaSize {
         fun blisko(x: Double, y: Double) = Math.abs(a - x) < 3 && Math.abs(b - y) < 3
         return when {

@@ -92,7 +92,7 @@ class MainActivity : AppCompatActivity() {
 
         // --- kafle ---
         val kafle = listOf(
-            Ui.kafel(this, "🖼️", "Drukuj zdjęcie", Ui.niebieski) { otworzZdjecie(null) },
+            Ui.kafel(this, "🖼️", "Drukuj zdjęcia", Ui.niebieski) { otworzZdjecie(null) },
             Ui.kafel(this, "📄", "Drukuj dokument", Ui.zielony) {
                 wyborDokumentu.launch(arrayOf("application/pdf", "image/*"))
             },
@@ -176,14 +176,22 @@ class MainActivity : AppCompatActivity() {
 
     @Suppress("DEPRECATION")
     private fun obsluzUdostepnienie(i: Intent?) {
-        if (i?.action != Intent.ACTION_SEND) return
+        if (i == null) return
+        if (i.action == Intent.ACTION_SEND_MULTIPLE) {
+            val lista: ArrayList<Uri> = (if (Build.VERSION.SDK_INT >= 33) i.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java)
+            else i.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)) ?: return
+            i.action = null
+            if (lista.isNotEmpty()) otworzZdjecia(lista)
+            return
+        }
+        if (i.action != Intent.ACTION_SEND) return
         val uri: Uri = (if (Build.VERSION.SDK_INT >= 33) i.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
         else i.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)) ?: return
         i.action = null
         val typ = i.type ?: contentResolver.getType(uri) ?: ""
         if (typ.startsWith("image/")) {
             AlertDialog.Builder(this).setTitle("Udostępniony obraz")
-                .setItems(arrayOf("Drukuj jako zdjęcie (10x15, 9x13…)", "Drukuj jako dokument (A4)")) { _, w ->
+                .setItems(arrayOf("Drukuj jako zdjęcie (10x15, 9x13, kilka na A4…)", "Drukuj jako dokument (A4)")) { _, w ->
                     if (w == 0) otworzZdjecie(uri) else dialogDokumentu(uri)
                 }.show()
         } else dialogDokumentu(uri)
@@ -192,6 +200,15 @@ class MainActivity : AppCompatActivity() {
     private fun otworzZdjecie(uri: Uri?) {
         val i = Intent(this, ZdjecieActivity::class.java)
         if (uri != null) { i.data = uri; i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+        startActivity(i)
+    }
+
+    private fun otworzZdjecia(uris: List<Uri>) {
+        val i = Intent(this, ZdjecieActivity::class.java)
+        val cd = android.content.ClipData.newRawUri("zdjecia", uris[0])
+        for (k in 1 until uris.size) cd.addItem(android.content.ClipData.Item(uris[k]))
+        i.clipData = cd
+        i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         startActivity(i)
     }
 

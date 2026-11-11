@@ -39,6 +39,9 @@ class UslugaDruku : PrintService() {
         val dane = job.document.data
         if (dane == null) { job.fail("Brak danych do druku"); return }
         val kopie = info.copies.coerceAtLeast(1)
+        // opcje z ekranu "Więcej opcji" (OpcjeDrukuActivity)
+        val wysoka = job.hasAdvancedOption("jakosc") && job.getAdvancedIntOption("jakosc") == 5
+        val reczny = job.hasAdvancedOption("reczny") && job.getAdvancedIntOption("reczny") == 1
         thread {
             var blad: String? = null
             val plik = File(cacheDir, "usluga_${System.currentTimeMillis()}.pdf")
@@ -62,7 +65,11 @@ class UslugaDruku : PrintService() {
                     kolor = atr.colorMode != PrintAttributes.COLOR_MODE_MONOCHROME,
                     dwustronnie = atr.duplexMode == PrintAttributes.DUPLEX_MODE_LONG_EDGE ||
                             atr.duplexMode == PrintAttributes.DUPLEX_MODE_SHORT_EDGE,
-                    media = mediaNazwa
+                    media = mediaNazwa,
+                    wysokaJakosc = wysoka,
+                    recznyPodajnik = reczny && m.recznyPodajnik,
+                    mediaSzerSetneMm = Math.round(mediaMm.first * 100).toInt(),
+                    mediaWysSetneMm = Math.round(mediaMm.second * 100).toInt()
                 )
                 val w = Wydruk.drukujPdf(this, d, m, plik, o, info.label, mediaNazwa, mediaMm)
                 if (w.isNotEmpty()) blad = w

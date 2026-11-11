@@ -48,6 +48,10 @@
         </activity>
         <activity android:name=".ZdjecieActivity" android:exported="false" android:screenOrientation="portrait" />
         <activity android:name=".SkanActivity" android:exported="false" android:screenOrientation="portrait" />
+        <!-- "Więcej opcji" w systemowym oknie drukowania -->
+        <activity android:name=".OpcjeDrukuActivity" android:exported="true"
+            android:permission="android.permission.START_PRINT_SERVICE_CONFIG_ACTIVITY"
+            android:screenOrientation="portrait" />
         <activity android:name=".WwwActivity" android:exported="false"
             android:configChanges="orientation|screenSize|keyboardHidden" />
 

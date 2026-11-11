@@ -251,7 +251,6 @@ object Wydruk {
         fun blisko(x: Double, y: Double) = Math.abs(a - x) < 3 && Math.abs(b - y) < 3
         return when {
             blisko(101.6, 152.4) || blisko(100.0, 150.0) -> PrintAttributes.MediaSize.NA_INDEX_4X6
-            blisko(127.0, 177.8) || blisko(130.0, 180.0) -> PrintAttributes.MediaSize.NA_5X7
             blisko(105.0, 148.0) -> PrintAttributes.MediaSize.ISO_A6
             blisko(148.0, 210.0) -> PrintAttributes.MediaSize.ISO_A5
             blisko(210.0, 297.0) -> PrintAttributes.MediaSize.ISO_A4

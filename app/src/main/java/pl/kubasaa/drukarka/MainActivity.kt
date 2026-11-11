@@ -47,8 +47,8 @@ class MainActivity : AppCompatActivity() {
 
     private val zgody = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { sprawdz() }
 
-    private val wyborDokumentu = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) dialogDokumentu(uri)
+    private val wyborDokumentu = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        if (uris.isNotEmpty()) dialogDokumentu(uris)
     }
 
     override fun onCreate(b: Bundle?) {
@@ -181,7 +181,14 @@ class MainActivity : AppCompatActivity() {
             val lista: ArrayList<Uri> = (if (Build.VERSION.SDK_INT >= 33) i.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java)
             else i.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)) ?: return
             i.action = null
-            if (lista.isNotEmpty()) otworzZdjecia(lista)
+            if (lista.isEmpty()) return
+            val wszystkieObrazy = lista.all { (contentResolver.getType(it) ?: "").startsWith("image/") }
+            if (wszystkieObrazy) {
+                AlertDialog.Builder(this).setTitle("Udostępnione obrazy: ${lista.size}")
+                    .setItems(arrayOf("Drukuj jako zdjęcia (9x13, 10x15, kilka na A4…)", "Drukuj jako dokumenty (A4)")) { _, w ->
+                        if (w == 0) otworzZdjecia(lista) else dialogDokumentu(lista)
+                    }.show()
+            } else dialogDokumentu(lista)
             return
         }
         if (i.action != Intent.ACTION_SEND) return
@@ -192,9 +199,9 @@ class MainActivity : AppCompatActivity() {
         if (typ.startsWith("image/")) {
             AlertDialog.Builder(this).setTitle("Udostępniony obraz")
                 .setItems(arrayOf("Drukuj jako zdjęcie (10x15, 9x13, kilka na A4…)", "Drukuj jako dokument (A4)")) { _, w ->
-                    if (w == 0) otworzZdjecie(uri) else dialogDokumentu(uri)
+                    if (w == 0) otworzZdjecie(uri) else dialogDokumentu(listOf(uri))
                 }.show()
-        } else dialogDokumentu(uri)
+        } else dialogDokumentu(listOf(uri))
     }
 
     private fun otworzZdjecie(uri: Uri?) {
@@ -587,77 +594,139 @@ class MainActivity : AppCompatActivity() {
 
     // ---------------- Drukowanie dokumentu ----------------
 
-    private fun dialogDokumentu(uri: Uri) {
-        val typ = contentResolver.getType(uri) ?: ""
+    private fun nazwaPliku(uri: Uri): String {
+        try {
+            contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+                if (c.moveToFirst()) return c.getString(0) ?: "plik"
+            }
+        } catch (e: Exception) {}
+        return uri.lastPathSegment ?: "plik"
+    }
+
+    private fun dialogDokumentu(wejscie: List<Uri>) {
+        val pliki = wejscie.toMutableList()
         var kopie = 1
         var kolor = true
         var dwustronnie = false
+        var wysoka = false
         val m = mozliwosci
         val l = LinearLayout(this)
         l.orientation = LinearLayout.VERTICAL
         l.setPadding(Ui.dp(this, 18), Ui.dp(this, 4), Ui.dp(this, 18), 0)
         lateinit var odswiez: () -> Unit
-        val kontener = LinearLayout(this); kontener.orientation = LinearLayout.VERTICAL
-        l.addView(kontener)
         odswiez = {
-            kontener.removeAllViews()
-            kontener.addView(Ui.naglowek(this, "Kopie: $kopie"))
-            kontener.addView(Ui.siatkaChipow(this, listOf(
+            l.removeAllViews()
+            l.addView(Ui.naglowek(this, "Pliki: ${pliki.size}"))
+            pliki.forEachIndexed { i, u ->
+                val w = LinearLayout(this)
+                w.orientation = LinearLayout.HORIZONTAL
+                w.gravity = Gravity.CENTER_VERTICAL
+                w.setPadding(Ui.dp(this, 10), Ui.dp(this, 6), Ui.dp(this, 6), Ui.dp(this, 6))
+                w.background = Ui.tlo(Ui.szaryTlo, Ui.dp(this, 10).toFloat())
+                val t = TextView(this)
+                t.text = "${i + 1}. " + nazwaPliku(u)
+                t.setTextColor(Ui.granat)
+                w.addView(t, LinearLayout.LayoutParams(0, -2, 1f))
+                if (pliki.size > 1) {
+                    val x = Ui.chip(this, "✕", Ui.czerwony, true) { pliki.removeAt(i); odswiez() }
+                    w.addView(x, LinearLayout.LayoutParams(Ui.dp(this, 44), Ui.dp(this, 40)))
+                }
+                l.addView(w, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = Ui.dp(this@MainActivity, 6) })
+            }
+            l.addView(Ui.naglowek(this, "Kopie każdego pliku: $kopie"))
+            l.addView(Ui.siatkaChipow(this, listOf(
                 Ui.chip(this, "−", Ui.czerwony, false) { if (kopie > 1) kopie--; odswiez() },
                 Ui.chip(this, "+", Ui.zielony, false) { if (kopie < 99) kopie++; odswiez() }
             ), 2))
-            kontener.addView(Ui.naglowek(this, "Kolor"))
-            kontener.addView(Ui.siatkaChipow(this, listOf(
-                Ui.chip(this, "Kolor", Ui.fiolet, kolor) { kolor = true; odswiez() },
-                Ui.chip(this, "Czarno-biały", Ui.fiolet, !kolor) { kolor = false; odswiez() }
-            ), 2))
+            if (m == null || m.kolor) {
+                l.addView(Ui.naglowek(this, "Kolor"))
+                l.addView(Ui.siatkaChipow(this, listOf(
+                    Ui.chip(this, "Kolor", Ui.fiolet, kolor) { kolor = true; odswiez() },
+                    Ui.chip(this, "Czarno-biały", Ui.fiolet, !kolor) { kolor = false; odswiez() }
+                ), 2))
+            }
             if (m == null || m.dwustronnie) {
-                kontener.addView(Ui.naglowek(this, "Strony"))
-                kontener.addView(Ui.siatkaChipow(this, listOf(
+                l.addView(Ui.naglowek(this, "Strony kartki"))
+                l.addView(Ui.siatkaChipow(this, listOf(
                     Ui.chip(this, "Jednostronnie", Ui.turkus, !dwustronnie) { dwustronnie = false; odswiez() },
                     Ui.chip(this, "Dwustronnie", Ui.turkus, dwustronnie) { dwustronnie = true; odswiez() }
                 ), 2))
             }
+            l.addView(Ui.naglowek(this, "Jakość"))
+            l.addView(Ui.siatkaChipow(this, listOf(
+                Ui.chip(this, "Normalna", Ui.niebieski, !wysoka) { wysoka = false; odswiez() },
+                Ui.chip(this, "Wysoka", Ui.niebieski, wysoka) { wysoka = true; odswiez() }
+            ), 2))
+            l.addView(Ui.przycisk(this, "＋ Dodaj pliki", Ui.niebieski) { dodajPliki = { nowe -> pliki.addAll(nowe.filter { it !in pliki }); odswiez() }; wyborDodatkowych.launch(arrayOf("application/pdf", "image/*")) },
+                LinearLayout.LayoutParams(-1, -2).apply { topMargin = Ui.dp(this@MainActivity, 12); bottomMargin = Ui.dp(this@MainActivity, 8) })
         }
         odswiez()
+        val sc = ScrollView(this); sc.addView(l)
         val d = Drukarki.aktywna(this)
-        AlertDialog.Builder(this).setTitle("Drukuj dokument" + (d?.let { " na: ${it.nazwa}" } ?: "")).setView(l)
-            .setPositiveButton("Drukuj") { _, _ -> drukujDokument(uri, typ, Ipp.Opcje(kopie = kopie, kolor = kolor, dwustronnie = dwustronnie), false) }
-            .setNeutralButton("Okno Androida") { _, _ -> drukujDokument(uri, typ, Ipp.Opcje(), true) }
+        AlertDialog.Builder(this).setTitle("Drukuj dokumenty" + (d?.let { " na: ${it.nazwa}" } ?: "")).setView(sc)
+            .setPositiveButton("🖨 Drukuj") { _, _ ->
+                drukujDokumenty(pliki.toList(), Ipp.Opcje(kopie = kopie, kolor = kolor, dwustronnie = dwustronnie, wysokaJakosc = wysoka), false)
+            }
+            .setNeutralButton("Okno Androida") { _, _ -> drukujDokumenty(pliki.toList(), Ipp.Opcje(), true) }
             .setNegativeButton("Anuluj", null).show()
     }
 
-    private fun drukujDokument(uri: Uri, typ: String, o: Ipp.Opcje, systemowo: Boolean) {
+    private var dodajPliki: ((List<Uri>) -> Unit)? = null
+    private val wyborDodatkowych = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        if (uris.isNotEmpty()) dodajPliki?.invoke(uris)
+    }
+
+    /** Drukuje kolejno kilka plików (każdy jako osobne zadanie, żeby dwustronność nie mieszała plików). */
+    private fun drukujDokumenty(uris: List<Uri>, o: Ipp.Opcje, systemowo: Boolean) {
+        if (uris.isEmpty()) return
         val d = Drukarki.aktywna(this)
         if (!systemowo && d == null) { brakDrukarki(); return }
-        val czekaj = AlertDialog.Builder(this).setMessage(if (systemowo) "Przygotowuję…" else "Wysyłam do drukarki ${d?.nazwa}…").setCancelable(false).show()
+        val czekaj = AlertDialog.Builder(this).setMessage("Przygotowuję…").setCancelable(false).show()
         thread {
-            var wynik = ""
-            var plikSystemowy: File? = null
-            try {
-                val pdf: File = if (typ.startsWith("image/")) Wydruk.obrazDoPdf(this, uri) ?: throw Exception("Nie udało się otworzyć obrazu")
-                else Wydruk.skopiuj(this, uri, "dokument.pdf")
-                if (systemowo) plikSystemowy = pdf
-                else {
-                    val dr = d!!
+            val wyniki = mutableListOf<String>()
+            val doSystemu = mutableListOf<Pair<File, String>>()
+            var m: Mozliwosci? = mozliwosci
+            if (!systemowo) {
+                val dr = d!!
+                try {
                     if (!Siec.osiagalna(this, dr.ip, dr.ippPort)) throw Exception("Drukarka ${dr.nazwa} nie odpowiada. Sprawdź sieć Wi-Fi.")
-                    val m = mozliwosci ?: Mozliwosci(Ipp.atrybuty(this, dr))
-                    if (!m.bezposrednio) throw Exception("Ta drukarka nie przyjmuje druku wprost - użyj „Okno Androida”.")
-                    val (mn, mm) = Wydruk.mediaA4(m)
-                    o.media = mn
-                    wynik = Wydruk.drukujPdf(this, dr, m, pdf, o, "Dokument", mn, mm)
-                    if (wynik.isEmpty()) wynik = "Wysłano do drukarki ${dr.nazwa} ✔"
+                    if (m == null) m = Mozliwosci(Ipp.atrybuty(this, dr))
+                    if (!m!!.bezposrednio) throw Exception("Ta drukarka nie przyjmuje druku wprost - użyj „Okno Androida”.")
+                } catch (e: Exception) {
+                    val tekst = e.message ?: "Błąd"
+                    runOnUiThread { czekaj.dismiss(); AlertDialog.Builder(this).setMessage(tekst).setPositiveButton("OK", null).show() }
+                    return@thread
                 }
-            } catch (e: OutOfMemoryError) {
-                wynik = "Za mało pamięci telefonu na ten dokument - użyj „Okno Androida”."
-            } catch (e: Exception) {
-                wynik = e.message ?: "Błąd"
+            }
+            uris.forEachIndexed { i, uri ->
+                val nazwa = nazwaPliku(uri)
+                runOnUiThread { czekaj.setMessage(if (systemowo) "Przygotowuję ${i + 1}/${uris.size}…" else "Wysyłam ${i + 1}/${uris.size}: $nazwa") }
+                try {
+                    val typ = contentResolver.getType(uri) ?: ""
+                    val pdf: File = if (typ.startsWith("image/")) Wydruk.obrazDoPdf(this, uri, "dok_$i.pdf") ?: throw Exception("nie można otworzyć obrazu")
+                    else Wydruk.skopiuj(this, uri, "dok_$i.pdf")
+                    if (systemowo) doSystemu.add(Pair(pdf, nazwa))
+                    else {
+                        val (mn, mm) = Wydruk.mediaA4(m)
+                        val op = Ipp.Opcje(kopie = o.kopie, kolor = o.kolor, dwustronnie = o.dwustronnie, wysokaJakosc = o.wysokaJakosc, media = mn)
+                        val w = Wydruk.drukujPdf(this, d!!, m!!, pdf, op, nazwa, mn, mm)
+                        wyniki.add(if (w.isEmpty()) "✔ $nazwa" else "✖ $nazwa: $w")
+                        pdf.delete()
+                    }
+                } catch (e: OutOfMemoryError) {
+                    wyniki.add("✖ $nazwa: za mało pamięci - użyj „Okno Androida”")
+                } catch (e: Exception) {
+                    wyniki.add("✖ $nazwa: ${e.message}")
+                }
             }
             runOnUiThread {
                 czekaj.dismiss()
-                val ps = plikSystemowy
-                if (ps != null) Wydruk.systemowoPlikPdf(this, ps, "Dokument")
-                else AlertDialog.Builder(this).setMessage(wynik).setPositiveButton("OK", null).show()
+                if (systemowo) {
+                    doSystemu.forEach { (f, n) -> Wydruk.systemowoPlikPdf(this, f, n) }
+                    if (wyniki.isNotEmpty()) AlertDialog.Builder(this).setMessage(wyniki.joinToString("\n")).setPositiveButton("OK", null).show()
+                } else {
+                    AlertDialog.Builder(this).setTitle("Wysłano do ${d?.nazwa}").setMessage(wyniki.joinToString("\n")).setPositiveButton("OK", null).show()
+                }
             }
         }
     }

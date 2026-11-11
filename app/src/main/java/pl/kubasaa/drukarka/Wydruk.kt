@@ -298,13 +298,13 @@ object Wydruk {
     }
 
     /** Zamienia obraz (dokument-zdjęcie) na PDF A4. */
-    fun obrazDoPdf(c: Context, uri: Uri): File? {
+    fun obrazDoPdf(c: Context, uri: Uri, nazwaPliku: String = "obraz.pdf"): File? {
         val b = wczytajObraz(c, uri, 3000) ?: return null
         val doc = PdfDocument()
         val s = doc.startPage(PdfDocument.PageInfo.Builder(595, 842, 1).create())
         narysujDopasowane(s.canvas, 595f, 842f, b)
         doc.finishPage(s)
-        val f = File(c.cacheDir, "obraz.pdf")
+        val f = File(c.cacheDir, nazwaPliku)
         FileOutputStream(f).use { doc.writeTo(it) }
         doc.close(); b.recycle()
         return f

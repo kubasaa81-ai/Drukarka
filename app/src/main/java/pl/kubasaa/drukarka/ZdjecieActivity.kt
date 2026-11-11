@@ -52,7 +52,10 @@ class ZdjecieActivity : AppCompatActivity() {
     private var aktualny = 0
     private val wspolny = Kompozycja.Stan()   // format / ułożenie / wypełnienie dla wszystkich
     private var naKartce = false               // false = każde zdjęcie na swojej odbitce
-    private var powtarzaj = true
+    private var powtarzaj = false
+    private var kolor = true
+    private var dwustronnie = false
+    private var wysoka = true
     private var linie = true
     private var kopie = 1
     private var reczny = false
@@ -64,7 +67,6 @@ class ZdjecieActivity : AppCompatActivity() {
     private lateinit var opcje: LinearLayout
     private lateinit var miniatury: LinearLayout
     private lateinit var wskazowka: TextView
-    private lateinit var tekstKopii: TextView
 
     private val wybor = registerForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(30)) { uris ->
         if (uris.isNotEmpty()) dodaj(uris) else if (pozycje.isEmpty()) finish()
@@ -234,22 +236,6 @@ class ZdjecieActivity : AppCompatActivity() {
             Ui.chip(this, n, Ui.turkus, wspolny.tryb == t) { ustawWszystkim { it.tryb = t }; zbudujOpcje(); odswiez() }
         }, 3))
 
-        opcje.addView(Ui.naglowek(this, if (naKartce) "Liczba kopii (kartek)" else "Liczba odbitek każdego zdjęcia"))
-        val k = LinearLayout(this)
-        k.orientation = LinearLayout.HORIZONTAL
-        k.gravity = Gravity.CENTER_VERTICAL
-        k.addView(Ui.przycisk(this, "−", Ui.czerwony) { if (kopie > 1) kopie--; tekstKopii.text = "$kopie"; odswiezInfo() },
-            LinearLayout.LayoutParams(Ui.dp(this, 64), -2))
-        tekstKopii = TextView(this)
-        tekstKopii.text = "$kopie"
-        tekstKopii.gravity = Gravity.CENTER
-        tekstKopii.setTextColor(Ui.granat)
-        tekstKopii.setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
-        k.addView(tekstKopii, LinearLayout.LayoutParams(Ui.dp(this, 70), -2))
-        k.addView(Ui.przycisk(this, "+", Ui.zielony) { if (kopie < 50) kopie++; tekstKopii.text = "$kopie"; odswiezInfo() },
-            LinearLayout.LayoutParams(Ui.dp(this, 64), -2))
-        opcje.addView(k)
-
         if (!naKartce && mozliwosci?.recznyPodajnik == true) {
             opcje.addView(Ui.naglowek(this, "Skąd papier"))
             opcje.addView(Ui.siatkaChipow(this, listOf(
@@ -358,7 +344,6 @@ class ZdjecieActivity : AppCompatActivity() {
             val n = naKartke()
             val st = ileStron()
             sb.append("Na kartce A4 mieści się $n × ${f.nazwa}. Zdjęć: ${pozycje.size}, kartek: $st")
-            if (kopie > 1) sb.append(" (× $kopie kopie)")
             if (st > 1) sb.append("\nPodgląd pokazuje kartkę ${stronaBiezacego() + 1} - wybierz miniaturę, żeby zobaczyć inną.")
             if (pozycje.size < n && !powtarzaj) sb.append("\nPuste miejsca zostaną białe - dodaj zdjęcia albo włącz „Powtarzaj”.")
             sb.append("\nOdbitki mają prawdziwy rozmiar ${f.nazwa} - wytnij po liniach.")
@@ -415,10 +400,69 @@ class ZdjecieActivity : AppCompatActivity() {
         }
     }
 
+    /** Okno z opcjami wydruku przed wysłaniem. */
     private fun drukuj() {
         val d = drukarka
         if (d == null) { Toast.makeText(this, "Najpierw dodaj drukarkę", Toast.LENGTH_LONG).show(); return }
         if (pozycje.isEmpty()) return
+        val m = mozliwosci
+        val l = LinearLayout(this)
+        l.orientation = LinearLayout.VERTICAL
+        l.setPadding(Ui.dp(this, 18), Ui.dp(this, 4), Ui.dp(this, 18), Ui.dp(this, 8))
+        lateinit var buduj: () -> Unit
+        buduj = {
+            l.removeAllViews()
+            val strony = ileStron()
+            val podsum = TextView(this)
+            podsum.text = (if (naKartce) "Kartek A4: $strony" else "Odbitek ${wspolny.format.nazwa}: $strony") + " × kopie: $kopie"
+            podsum.setTextColor(Ui.szaryTekst)
+            l.addView(podsum)
+            l.addView(Ui.naglowek(this, if (naKartce) "Liczba kopii (kartek)" else "Liczba kopii każdego zdjęcia"))
+            val k = LinearLayout(this)
+            k.orientation = LinearLayout.HORIZONTAL
+            k.gravity = Gravity.CENTER_VERTICAL
+            k.addView(Ui.przycisk(this, "−", Ui.czerwony) { if (kopie > 1) kopie--; buduj() }, LinearLayout.LayoutParams(Ui.dp(this, 60), -2))
+            val t = TextView(this)
+            t.text = "$kopie"; t.gravity = Gravity.CENTER; t.setTextColor(Ui.granat)
+            t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
+            k.addView(t, LinearLayout.LayoutParams(Ui.dp(this, 64), -2))
+            k.addView(Ui.przycisk(this, "+", Ui.zielony) { if (kopie < 50) kopie++; buduj() }, LinearLayout.LayoutParams(Ui.dp(this, 60), -2))
+            l.addView(k)
+            if (m == null || m.kolor) {
+                l.addView(Ui.naglowek(this, "Kolor"))
+                l.addView(Ui.siatkaChipow(this, listOf(
+                    Ui.chip(this, "Kolor", Ui.fiolet, kolor) { kolor = true; buduj() },
+                    Ui.chip(this, "Czarno-biały", Ui.fiolet, !kolor) { kolor = false; buduj() }
+                ), 2))
+            }
+            if ((m == null || m.dwustronnie) && !reczny) {
+                l.addView(Ui.naglowek(this, "Strony kartki"))
+                l.addView(Ui.siatkaChipow(this, listOf(
+                    Ui.chip(this, "Jednostronnie", Ui.turkus, !dwustronnie) { dwustronnie = false; buduj() },
+                    Ui.chip(this, "Dwustronnie", Ui.turkus, dwustronnie) { dwustronnie = true; buduj() }
+                ), 2))
+                if (dwustronnie && strony < 2) {
+                    val u = TextView(this)
+                    u.text = "Jest tylko 1 strona - druga strona kartki zostanie pusta."
+                    u.setTextColor(Ui.pomarancz)
+                    l.addView(u)
+                }
+            }
+            l.addView(Ui.naglowek(this, "Jakość"))
+            l.addView(Ui.siatkaChipow(this, listOf(
+                Ui.chip(this, "Normalna\n(szybciej)", Ui.niebieski, !wysoka) { wysoka = false; buduj() },
+                Ui.chip(this, "Wysoka\n(zdjęcia)", Ui.niebieski, wysoka) { wysoka = true; buduj() }
+            ), 2))
+        }
+        buduj()
+        val sc = ScrollView(this)
+        sc.addView(l)
+        AlertDialog.Builder(this).setTitle("Drukuj na: ${d.nazwa}").setView(sc)
+            .setPositiveButton("🖨 Drukuj") { _, _ -> wyslij(d) }
+            .setNegativeButton("Anuluj", null).show()
+    }
+
+    private fun wyslij(d: Drukarka) {
         val czekaj = AlertDialog.Builder(this).setMessage("Przygotowuję i wysyłam do ${d.nazwa}…").setCancelable(false).show()
         thread {
             var wynik: String
@@ -441,7 +485,8 @@ class ZdjecieActivity : AppCompatActivity() {
                 } else {
                     val a4 = Wydruk.mediaA4(m); mediaNazwa = a4.first; mediaMm = a4.second
                 }
-                val o = Ipp.Opcje(kopie = kopie, kolor = true, media = mediaNazwa, zdjecie = true,
+                val o = Ipp.Opcje(kopie = kopie, kolor = kolor, dwustronnie = dwustronnie && !reczny, wysokaJakosc = wysoka,
+                    media = mediaNazwa, zdjecie = true,
                     recznyPodajnik = reczny && !naKartce,
                     mediaSzerSetneMm = Math.round(mediaMm.first * 100).toInt(),
                     mediaWysSetneMm = Math.round(mediaMm.second * 100).toInt())

@@ -46,6 +46,7 @@ class Mozliwosci(a: Ipp.Atrybuty) {
     }
     val rasterKolor = a.teksty("pwg-raster-document-type-supported").let { t -> t.isEmpty() || t.any { it.startsWith("srgb") } }
     val bezposrednio = pdf || raster
+    val tylKartki = a.tekst("pwg-raster-document-sheet-back")   // normal / flipped / rotated / manual-tumble
 }
 
 object Wydruk {
@@ -151,6 +152,13 @@ object Wydruk {
                 for (i in 0 until ileStron) {
                     val b = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
                     val cv = Canvas(b)
+                    // tył kartki (strony 2, 4, ...) przy druku dwustronnym - tak, jak wymaga drukarka
+                    if (opcje.dwustronnie && i % 2 == 1) {
+                        when (m.tylKartki) {
+                            "rotated" -> cv.rotate(180f, w / 2f, h / 2f)
+                            "flipped" -> cv.scale(1f, -1f, w / 2f, h / 2f)
+                        }
+                    }
                     rysuj(cv, w.toFloat(), h.toFloat(), (dpi / 25.4).toFloat(), i)
                     r.strona(b, mediaNazwa, ileStron)
                     b.recycle()

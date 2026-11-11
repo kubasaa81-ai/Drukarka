@@ -182,7 +182,8 @@ object Ipp {
         var recznyPodajnik: Boolean = false,
         var mediaSzerSetneMm: Int = 0,        // do media-col (ręczny podajnik)
         var mediaWysSetneMm: Int = 0,
-        var zdjecie: Boolean = false
+        var zdjecie: Boolean = false,
+        var wysokaJakosc: Boolean = false
     )
 
     /** Wysyła gotowy plik (PDF albo PWG-raster) jako zadanie drukowania. */
@@ -196,7 +197,7 @@ object Ipp {
             .slowo("sides", if (o.dwustronnie) "two-sided-long-edge" else "one-sided")
             .slowo("print-color-mode", if (o.kolor) "color" else "monochrome")
             .slowo("print-scaling", if (o.zdjecie) "none" else "fit")
-        if (o.zdjecie) z.liczba("print-quality", 5, T_ENUM) // wysoka
+        z.liczba("print-quality", if (o.wysokaJakosc) 5 else 4, T_ENUM) // 5 = wysoka, 4 = normalna
         if (o.recznyPodajnik && o.mediaSzerSetneMm > 0) {
             z.poczatekKolekcji("media-col")
                 .czlonek("media-size").poczatekKolekcji("")

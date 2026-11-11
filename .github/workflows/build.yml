@@ -26,7 +26,16 @@ jobs:
         run: base64 -d app/klucz.b64 > app/klucz.jks
 
       - name: Budowanie
-        run: gradle :app:assembleDebug --no-daemon --stacktrace
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle :app:assembleDebug --no-daemon 2>&1 | tee build.log
+
+      - name: Bledy kompilacji
+        if: failure()
+        shell: bash
+        run: |
+          grep -E "^e: |error:|What went wrong|AAPT|> " build.log | head -40 | while IFS= read -r l; do echo "::error::$l"; done
 
       - name: Nazwa pliku
         run: cp app/build/outputs/apk/debug/app-debug.apk Drukarka.apk

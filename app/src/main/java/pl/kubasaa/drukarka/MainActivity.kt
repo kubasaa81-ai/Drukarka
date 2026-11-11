@@ -103,7 +103,9 @@ class MainActivity : AppCompatActivity() {
             Ui.kafel(this, "🔎", "Drukarki\n(dodaj / wybierz)", Ui.turkus) { ekranDrukarek() },
             Ui.kafel(this, "📶", "Sieć Wi-Fi", Ui.granat) {
                 try { startActivity(Siec.intencjaPrzelaczWifi()) } catch (e: Exception) {}
-            }
+            },
+            Ui.kafel(this, "⭐", "Drukuj z innych\naplikacji", Color.rgb(194, 24, 91)) { domyslnaDrukarka() },
+            Ui.kafel(this, "ℹ️", "Pomoc", Color.rgb(84, 110, 122)) { pomoc() }
         )
         for (i in kafle.indices step 2) {
             val r = LinearLayout(this)
@@ -401,6 +403,35 @@ class MainActivity : AppCompatActivity() {
         pr.gravity = Gravity.END
         r.addView(pr, LinearLayout.LayoutParams(Ui.dp(this, 44), -2))
         return r
+    }
+
+    // ---------------- Drukowanie z innych aplikacji ----------------
+
+    private fun domyslnaDrukarka() {
+        AlertDialog.Builder(this)
+            .setTitle("Drukuj z innych aplikacji")
+            .setMessage("Żeby „Drukuj” w każdej aplikacji (galeria, PDF, Chrome, Gmail) wysyłało przez tę aplikację:\n\n" +
+                    "1. Naciśnij „Otwórz ustawienia druku”.\n" +
+                    "2. Włącz usługę „Drukarka”.\n" +
+                    "3. Wyłącz „Brother Print Service” i „Domyślna usługa druku” - wtedy w oknie drukowania będą tylko Twoje drukarki z tej aplikacji.\n\n" +
+                    "W oknie drukowania wybierz drukarkę raz - Android zapamięta ją jako domyślną.")
+            .setPositiveButton("Otwórz ustawienia druku") { _, _ ->
+                try { startActivity(Intent(android.provider.Settings.ACTION_PRINT_SETTINGS)) } catch (e: Exception) {
+                    Toast.makeText(this, "Ustawienia → Połączenia → Więcej ustawień → Drukowanie", Toast.LENGTH_LONG).show()
+                }
+            }
+            .setNegativeButton("Zamknij", null).show()
+    }
+
+    private fun pomoc() {
+        AlertDialog.Builder(this)
+            .setTitle("Pomoc")
+            .setMessage("• Drukarki: „Drukarki (dodaj / wybierz)” → Szukaj w sieci. Strzałki ‹ › na karcie zmieniają drukarkę.\n\n" +
+                    "• Zła sieć: czerwony pasek → „Przełącz Wi-Fi” i wybierz sieć drukarki. Aplikacja sprawdzi drukarkę sama.\n\n" +
+                    "• Zdjęcia: „Całe zdjęcie + rozmyte tło” = pionowe zdjęcie na poziomej odbitce bez białych pasów i bez ucinania.\n\n" +
+                    "• Z galerii: Udostępnij → Drukarka.\n\n" +
+                    "• Ustawienia drukarki: hasło jest na naklejce drukarki („Pwd”).")
+            .setPositiveButton("OK", null).show()
     }
 
     // ---------------- Ustawienia drukarki ----------------

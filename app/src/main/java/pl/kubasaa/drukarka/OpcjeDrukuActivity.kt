@@ -33,6 +33,8 @@ class OpcjeDrukuActivity : AppCompatActivity() {
     private var maKolor = true
     private var maDuplex = true
     private var maReczny = false
+    private var typ = ""
+    private var typy: List<String> = emptyList()
     private lateinit var tresc: LinearLayout
 
     @Suppress("DEPRECATION")
@@ -85,7 +87,7 @@ class OpcjeDrukuActivity : AppCompatActivity() {
         val d = Drukarki.lista(this).firstOrNull { it.ip == ip }
         if (d != null) thread {
             val m = try { Mozliwosci(Ipp.atrybuty(this, d)) } catch (e: Exception) { null }
-            if (m?.recznyPodajnik == true) runOnUiThread { maReczny = true; buduj() }
+            if (m != null) runOnUiThread { maReczny = m.recznyPodajnik; typy = m.typyPapieru; buduj() }
         }
     }
 
@@ -136,6 +138,8 @@ class OpcjeDrukuActivity : AppCompatActivity() {
             }, 3))
         }
 
+        tresc.addView(Ui.wyborTypuPapieru(this, typy, typ) { typ = it; buduj() })
+
         if (maReczny) {
             tresc.addView(Ui.naglowek(this, "Skąd papier"))
             tresc.addView(Ui.siatkaChipow(this, listOf(
@@ -170,6 +174,7 @@ class OpcjeDrukuActivity : AppCompatActivity() {
         nowe.setAttributes(ab.build())
         nowe.putAdvancedOption("jakosc", if (wysoka) 5 else 4)
         nowe.putAdvancedOption("reczny", if (reczny) 1 else 0)
+        nowe.putAdvancedOption("typ", typ)
         setResult(RESULT_OK, Intent().putExtra(PrintService.EXTRA_PRINT_JOB_INFO, nowe.build()))
         finish()
     }

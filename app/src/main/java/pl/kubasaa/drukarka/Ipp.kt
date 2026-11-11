@@ -168,7 +168,7 @@ object Ipp {
                     "document-format-supported", "media-supported", "media-ready",
                     "sides-supported", "print-color-mode-supported", "color-supported",
                     "pwg-raster-document-resolution-supported", "pwg-raster-document-type-supported",
-                    "pwg-raster-document-sheet-back", "media-source-supported"
+                    "pwg-raster-document-sheet-back", "media-source-supported", "media-type-supported"
                 )
             )
         return wyslij(c, d, z.bajty(), null)
@@ -183,7 +183,8 @@ object Ipp {
         var mediaSzerSetneMm: Int = 0,        // do media-col (ręczny podajnik)
         var mediaWysSetneMm: Int = 0,
         var zdjecie: Boolean = false,
-        var wysokaJakosc: Boolean = false
+        var wysokaJakosc: Boolean = false,
+        var typPapieru: String = ""           // media-type, np. photographic-glossy; puste = jak w drukarce
     )
 
     /** Wysyła gotowy plik (PDF albo PWG-raster) jako zadanie drukowania. */
@@ -198,18 +199,55 @@ object Ipp {
             .slowo("print-color-mode", if (o.kolor) "color" else "monochrome")
             .slowo("print-scaling", if (o.zdjecie) "none" else "fit")
         z.liczba("print-quality", if (o.wysokaJakosc) 5 else 4, T_ENUM) // 5 = wysoka, 4 = normalna
-        if (o.recznyPodajnik && o.mediaSzerSetneMm > 0) {
+        // wymiary papieru w setnych mm (do media-col)
+        val wym: Pair<Int, Int>? = if (o.mediaSzerSetneMm > 0) Pair(o.mediaSzerSetneMm, o.mediaWysSetneMm)
+        else wymiaryMm(o.media)?.let { Pair(Math.round(minOf(it.first, it.second) * 100).toInt(), Math.round(maxOf(it.first, it.second) * 100).toInt()) }
+        if ((o.recznyPodajnik || o.typPapieru.isNotBlank()) && wym != null) {
             z.poczatekKolekcji("media-col")
                 .czlonek("media-size").poczatekKolekcji("")
-                .czlonek("x-dimension").liczba("", o.mediaSzerSetneMm)
-                .czlonek("y-dimension").liczba("", o.mediaWysSetneMm)
+                .czlonek("x-dimension").liczba("", wym.first)
+                .czlonek("y-dimension").liczba("", wym.second)
                 .koniecKolekcji()
-                .czlonek("media-source").slowo("", "manual")
-                .koniecKolekcji()
+            if (o.recznyPodajnik) z.czlonek("media-source").slowo("", "manual")
+            if (o.typPapieru.isNotBlank()) z.czlonek("media-type").slowo("", o.typPapieru)
+            z.koniecKolekcji()
         } else if (o.media.isNotBlank()) {
             z.slowo("media", o.media)
         }
         return wyslij(c, d, z.bajty(), plik)
+    }
+
+    // ---------------- Typy papieru ----------------
+
+    /** Polska nazwa typu papieru (media-type). */
+    fun nazwaTypu(k: String): String {
+        val m = k.lowercase()
+        return when {
+            m == "stationery" -> "Zwykły"
+            m == "stationery-lightweight" || m.contains("thin") || m.contains("lightweight") -> "Cienki"
+            m == "stationery-heavyweight" || m.contains("thicker") || m.contains("extra-heavy") -> if (m.contains("thicker") || m.contains("extra")) "Bardzo gruby" else "Gruby"
+            m.contains("thick") || m.contains("heavy") -> "Gruby"
+            m.contains("recycled") -> "Ekologiczny"
+            m.contains("glossy") || m.contains("gloss") -> "Błyszczący (foto)"
+            m.contains("matte") -> "Matowy (foto)"
+            m.startsWith("photographic") -> "Fotograficzny"
+            m == "bond" || m.contains("bond") -> "Bond"
+            m.contains("cardstock") || m.contains("card") -> "Karton"
+            m.contains("label") -> "Etykiety"
+            m.contains("envelope") -> "Koperta"
+            m.contains("transparen") -> "Folia"
+            m.contains("coated") -> "Powlekany"
+            else -> k
+        }
+    }
+
+    /** Lista typów do wyboru: najczęstsze najpierw, bez powtórzeń nazw. Gdy drukarka nic nie podała - podstawowe. */
+    fun typyDoWyboru(z: List<String>): List<String> {
+        val lista = if (z.isEmpty()) listOf("stationery", "stationery-heavyweight", "photographic-glossy") else z
+        val kolejnosc = listOf("Zwykły", "Gruby", "Bardzo gruby", "Błyszczący (foto)", "Cienki", "Ekologiczny", "Karton", "Etykiety", "Koperta")
+        val bezPowtorzen = LinkedHashMap<String, String>()
+        for (t in lista) bezPowtorzen.putIfAbsent(nazwaTypu(t), t)
+        return bezPowtorzen.entries.sortedBy { e -> kolejnosc.indexOf(e.key).let { if (it < 0) 99 else it } }.map { it.value }
     }
 
     // ---------------- Rozmiary papieru z nazw PWG ----------------

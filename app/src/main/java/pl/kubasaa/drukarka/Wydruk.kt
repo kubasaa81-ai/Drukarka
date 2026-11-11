@@ -46,7 +46,8 @@ class Mozliwosci(a: Ipp.Atrybuty) {
     }
     val rasterKolor = a.teksty("pwg-raster-document-type-supported").let { t -> t.isEmpty() || t.any { it.startsWith("srgb") } }
     val bezposrednio = pdf || raster
-    val tylKartki = a.tekst("pwg-raster-document-sheet-back")   // normal / flipped / rotated / manual-tumble
+    val tylKartki = a.tekst("pwg-raster-document-sheet-back")
+    val typyPapieru = a.teksty("media-type-supported")   // normal / flipped / rotated / manual-tumble
 }
 
 object Wydruk {

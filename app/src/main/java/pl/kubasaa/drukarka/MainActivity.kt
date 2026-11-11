@@ -609,6 +609,7 @@ class MainActivity : AppCompatActivity() {
         var kolor = true
         var dwustronnie = false
         var wysoka = false
+        var typ = ""
         val m = mozliwosci
         val l = LinearLayout(this)
         l.orientation = LinearLayout.VERTICAL
@@ -657,6 +658,7 @@ class MainActivity : AppCompatActivity() {
                 Ui.chip(this, "Normalna", Ui.niebieski, !wysoka) { wysoka = false; odswiez() },
                 Ui.chip(this, "Wysoka", Ui.niebieski, wysoka) { wysoka = true; odswiez() }
             ), 2))
+            l.addView(Ui.wyborTypuPapieru(this, m?.typyPapieru ?: emptyList(), typ) { typ = it; odswiez() })
             l.addView(Ui.przycisk(this, "＋ Dodaj pliki", Ui.niebieski) { dodajPliki = { nowe -> pliki.addAll(nowe.filter { it !in pliki }); odswiez() }; wyborDodatkowych.launch(arrayOf("application/pdf", "image/*")) },
                 LinearLayout.LayoutParams(-1, -2).apply { topMargin = Ui.dp(this@MainActivity, 12); bottomMargin = Ui.dp(this@MainActivity, 8) })
         }
@@ -665,7 +667,7 @@ class MainActivity : AppCompatActivity() {
         val d = Drukarki.aktywna(this)
         AlertDialog.Builder(this).setTitle("Drukuj dokumenty" + (d?.let { " na: ${it.nazwa}" } ?: "")).setView(sc)
             .setPositiveButton("🖨 Drukuj") { _, _ ->
-                drukujDokumenty(pliki.toList(), Ipp.Opcje(kopie = kopie, kolor = kolor, dwustronnie = dwustronnie, wysokaJakosc = wysoka), false)
+                drukujDokumenty(pliki.toList(), Ipp.Opcje(kopie = kopie, kolor = kolor, dwustronnie = dwustronnie, wysokaJakosc = wysoka, typPapieru = typ), false)
             }
             .setNeutralButton("Okno Androida") { _, _ -> drukujDokumenty(pliki.toList(), Ipp.Opcje(), true) }
             .setNegativeButton("Anuluj", null).show()
@@ -708,7 +710,8 @@ class MainActivity : AppCompatActivity() {
                     if (systemowo) doSystemu.add(Pair(pdf, nazwa))
                     else {
                         val (mn, mm) = Wydruk.mediaA4(m)
-                        val op = Ipp.Opcje(kopie = o.kopie, kolor = o.kolor, dwustronnie = o.dwustronnie, wysokaJakosc = o.wysokaJakosc, media = mn)
+                        val op = Ipp.Opcje(kopie = o.kopie, kolor = o.kolor, dwustronnie = o.dwustronnie, wysokaJakosc = o.wysokaJakosc, media = mn, typPapieru = o.typPapieru,
+                            mediaSzerSetneMm = Math.round(mm.first * 100).toInt(), mediaWysSetneMm = Math.round(mm.second * 100).toInt())
                         val w = Wydruk.drukujPdf(this, d!!, m!!, pdf, op, nazwa, mn, mm)
                         wyniki.add(if (w.isEmpty()) "✔ $nazwa" else "✖ $nazwa: $w")
                         pdf.delete()

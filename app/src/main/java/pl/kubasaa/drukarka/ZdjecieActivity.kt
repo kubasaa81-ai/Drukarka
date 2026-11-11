@@ -57,6 +57,7 @@ class ZdjecieActivity : AppCompatActivity() {
     private var kolor = true
     private var dwustronnie = false
     private var wysoka = true
+    private var typPapieru = ""
     private var linie = true
     private var kopie = 1
     private var reczny = false
@@ -494,6 +495,7 @@ class ZdjecieActivity : AppCompatActivity() {
                 Ui.chip(this, "Normalna\n(szybciej)", Ui.niebieski, !wysoka) { wysoka = false; buduj() },
                 Ui.chip(this, "Wysoka\n(zdjęcia)", Ui.niebieski, wysoka) { wysoka = true; buduj() }
             ), 2))
+            l.addView(Ui.wyborTypuPapieru(this, m?.typyPapieru ?: emptyList(), typPapieru) { typPapieru = it; buduj() })
         }
         buduj()
         val sc = ScrollView(this)
@@ -526,7 +528,7 @@ class ZdjecieActivity : AppCompatActivity() {
                 } else {
                     val a4 = Wydruk.mediaA4(m); mediaNazwa = a4.first; mediaMm = a4.second
                 }
-                val o = Ipp.Opcje(kopie = kopie, kolor = kolor, dwustronnie = dwustronnie && !reczny, wysokaJakosc = wysoka,
+                val o = Ipp.Opcje(kopie = kopie, kolor = kolor, dwustronnie = dwustronnie && !reczny, wysokaJakosc = wysoka, typPapieru = typPapieru,
                     media = mediaNazwa, zdjecie = true,
                     recznyPodajnik = reczny && !naKartce,
                     mediaSzerSetneMm = Math.round(mediaMm.first * 100).toInt(),

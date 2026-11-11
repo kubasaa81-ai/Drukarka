@@ -42,6 +42,7 @@ class UslugaDruku : PrintService() {
         // opcje z ekranu "Więcej opcji" (OpcjeDrukuActivity)
         val wysoka = job.hasAdvancedOption("jakosc") && job.getAdvancedIntOption("jakosc") == 5
         val reczny = job.hasAdvancedOption("reczny") && job.getAdvancedIntOption("reczny") == 1
+        val typPapieru = if (job.hasAdvancedOption("typ")) job.getAdvancedStringOption("typ") ?: "" else ""
         thread {
             var blad: String? = null
             val plik = File(cacheDir, "usluga_${System.currentTimeMillis()}.pdf")
@@ -67,6 +68,7 @@ class UslugaDruku : PrintService() {
                             atr.duplexMode == PrintAttributes.DUPLEX_MODE_SHORT_EDGE,
                     media = mediaNazwa,
                     wysokaJakosc = wysoka,
+                    typPapieru = typPapieru,
                     recznyPodajnik = reczny && m.recznyPodajnik,
                     mediaSzerSetneMm = Math.round(mediaMm.first * 100).toInt(),
                     mediaWysSetneMm = Math.round(mediaMm.second * 100).toInt()

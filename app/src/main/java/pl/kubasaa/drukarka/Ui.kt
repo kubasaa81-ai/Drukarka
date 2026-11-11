@@ -136,6 +136,28 @@ object Ui {
         return l
     }
 
+    /** Wybór typu papieru: "Jak w drukarce" + typy z drukarki. [typy] - surowe nazwy IPP. */
+    fun wyborTypuPapieru(c: Context, typy: List<String>, wybrany: String, onWybor: (String) -> Unit): View {
+        val l = LinearLayout(c)
+        l.orientation = LinearLayout.VERTICAL
+        l.addView(naglowek(c, "Typ papieru"))
+        val chipy = mutableListOf<View>(chip(c, "Jak w drukarce", Color.rgb(121, 85, 72), wybrany.isBlank()) { onWybor("") })
+        Ipp.typyDoWyboru(typy).take(11).forEach { t ->
+            chipy.add(chip(c, Ipp.nazwaTypu(t), Color.rgb(121, 85, 72), wybrany == t) { onWybor(t) })
+        }
+        l.addView(siatkaChipow(c, chipy, 3))
+        val m = wybrany.lowercase()
+        if (m.contains("gloss") || m.contains("heavy") || m.contains("thick") || m.contains("card") || m.startsWith("photographic")) {
+            val t = TextView(c)
+            t.text = "Ten papier kładź pojedynczo do szczeliny ręcznej, stroną do druku do góry. Używaj tylko papieru do drukarek LASEROWYCH."
+            t.setTextColor(pomarancz)
+            t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            t.setPadding(0, dp(c, 4), 0, 0)
+            l.addView(t)
+        }
+        return l
+    }
+
     /** Wiersz z chipami, zawijany ręcznie co [naWiersz] elementów (bez dodatkowych bibliotek). */
     fun siatkaChipow(c: Context, chipy: List<View>, naWiersz: Int): LinearLayout {
         val pion = LinearLayout(c)

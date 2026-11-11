@@ -50,6 +50,7 @@ class ZdjecieActivity : AppCompatActivity() {
 
     private val pozycje = mutableListOf<Pozycja>()
     private var aktualny = 0
+    private var strona = 0                     // która kartka jest w podglądzie
     private val wspolny = Kompozycja.Stan()   // format / ułożenie / wypełnienie dla wszystkich
     private var naKartce = false               // false = każde zdjęcie na swojej odbitce
     private var powtarzaj = false
@@ -67,6 +68,8 @@ class ZdjecieActivity : AppCompatActivity() {
     private lateinit var opcje: LinearLayout
     private lateinit var miniatury: LinearLayout
     private lateinit var wskazowka: TextView
+    private lateinit var nawigacja: LinearLayout
+    private lateinit var tekstStrony: TextView
 
     private val wybor = registerForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(30)) { uris ->
         if (uris.isNotEmpty()) dodaj(uris) else if (pozycje.isEmpty()) finish()
@@ -89,6 +92,24 @@ class ZdjecieActivity : AppCompatActivity() {
 
         podglad = Podglad(this)
         tresc.addView(podglad, LinearLayout.LayoutParams(-1, Ui.dp(this, 360)))
+
+        // przewijanie kartek podglądu: ‹  Kartka 2 z 3  ›
+        nawigacja = LinearLayout(this)
+        nawigacja.orientation = LinearLayout.HORIZONTAL
+        nawigacja.gravity = Gravity.CENTER_VERTICAL
+        nawigacja.setPadding(0, Ui.dp(this, 8), 0, 0)
+        nawigacja.addView(Ui.przycisk(this, "‹  Poprzednia", Ui.niebieski) { zmienStrone(-1) },
+            LinearLayout.LayoutParams(0, -2, 1f))
+        tekstStrony = TextView(this)
+        tekstStrony.gravity = Gravity.CENTER
+        tekstStrony.setTextColor(Ui.granat)
+        tekstStrony.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+        tekstStrony.typeface = android.graphics.Typeface.DEFAULT_BOLD
+        nawigacja.addView(tekstStrony, LinearLayout.LayoutParams(0, -2, 1f))
+        nawigacja.addView(Ui.przycisk(this, "Następna  ›", Ui.niebieski) { zmienStrone(1) },
+            LinearLayout.LayoutParams(0, -2, 1f))
+        nawigacja.visibility = View.GONE
+        tresc.addView(nawigacja, LinearLayout.LayoutParams(-1, -2))
 
         wskazowka = TextView(this)
         wskazowka.setTextColor(Ui.szaryTekst)
@@ -172,6 +193,7 @@ class ZdjecieActivity : AppCompatActivity() {
                     // kilka małych zdjęć - od razu proponujemy kartkę A4
                     naKartce = true
                 }
+                strona = stronaZdjecia(aktualny)
                 zbudujOpcje(); pokazMiniatury(); odswiez()
             }
         }
@@ -191,7 +213,7 @@ class ZdjecieActivity : AppCompatActivity() {
         opcje.addView(Ui.naglowek(this, "Papier"))
         opcje.addView(Ui.siatkaChipow(this, listOf(
             Ui.chip(this, "Jedna odbitka\nna kartce", Ui.czerwony, !naKartce) { naKartce = false; zbudujOpcje(); odswiez() },
-            Ui.chip(this, "Kilka zdjęć\nna kartce A4", Ui.czerwony, naKartce) { naKartce = true; zbudujOpcje(); odswiez() }
+            Ui.chip(this, "Kilka zdjęć\nna kartce A4", Ui.czerwony, naKartce) { naKartce = true; strona = stronaZdjecia(aktualny); zbudujOpcje(); odswiez() }
         ), 2))
 
         opcje.addView(Ui.naglowek(this, "Rozmiar odbitki"))
@@ -256,7 +278,7 @@ class ZdjecieActivity : AppCompatActivity() {
             val wybrany = i == aktualny
             iv.background = Ui.tlo(Color.WHITE, Ui.dp(this, 8).toFloat(), Ui.dp(this, if (wybrany) 3 else 1), if (wybrany) Ui.niebieski else Color.LTGRAY)
             iv.setPadding(Ui.dp(this, 3), Ui.dp(this, 3), Ui.dp(this, 3), Ui.dp(this, 3))
-            iv.setOnClickListener { aktualny = i; pokazMiniatury(); odswiez() }
+            iv.setOnClickListener { aktualny = i; strona = stronaZdjecia(i); pokazMiniatury(); odswiez() }
             iv.setOnLongClickListener {
                 AlertDialog.Builder(this).setMessage("Usunąć to zdjęcie z wydruku?")
                     .setPositiveButton("Usuń") { _, _ ->
@@ -301,10 +323,29 @@ class ZdjecieActivity : AppCompatActivity() {
         return if (powtarzaj && pozycje.isNotEmpty()) i % pozycje.size else null
     }
 
-    private fun stronaBiezacego(): Int = if (naKartce) aktualny / maxOf(1, naKartke()) else aktualny
+    private fun stronaZdjecia(i: Int): Int = if (naKartce) i / maxOf(1, naKartke()) else i
+
+    private fun stronaBiezacego(): Int =
+        if (naKartce) strona.coerceIn(0, maxOf(0, ileStron() - 1)) else aktualny.coerceIn(0, maxOf(0, pozycje.size - 1))
+
+    private fun zmienStrone(o: Int) {
+        val n = ileStron()
+        if (n <= 1) return
+        if (naKartce) {
+            strona = (stronaBiezacego() + o + n) % n
+            aktualny = minOf(strona * maxOf(1, naKartke()), pozycje.size - 1)
+        } else {
+            aktualny = (aktualny + o + n) % n
+        }
+        pokazMiniatury(); odswiez()
+    }
 
     private fun odswiez() {
-        if (pozycje.isEmpty()) return
+        if (pozycje.isEmpty()) { nawigacja.visibility = View.GONE; return }
+        val n = ileStron()
+        if (naKartce && strona >= n) strona = maxOf(0, n - 1)
+        nawigacja.visibility = if (n > 1) View.VISIBLE else View.GONE
+        tekstStrony.text = (if (naKartce) "Kartka " else "Zdjęcie ") + "${stronaBiezacego() + 1} z $n"
         if (naKartce) {
             podglad.ustaw(210.0, 297.0)
         } else {
@@ -344,7 +385,7 @@ class ZdjecieActivity : AppCompatActivity() {
             val n = naKartke()
             val st = ileStron()
             sb.append("Na kartce A4 mieści się $n × ${f.nazwa}. Zdjęć: ${pozycje.size}, kartek: $st")
-            if (st > 1) sb.append("\nPodgląd pokazuje kartkę ${stronaBiezacego() + 1} - wybierz miniaturę, żeby zobaczyć inną.")
+            if (st > 1) sb.append("\nKolejne kartki zobaczysz przyciskami Poprzednia / Następna pod podglądem.")
             if (pozycje.size < n && !powtarzaj) sb.append("\nPuste miejsca zostaną białe - dodaj zdjęcia albo włącz „Powtarzaj”.")
             sb.append("\nOdbitki mają prawdziwy rozmiar ${f.nazwa} - wytnij po liniach.")
         } else {
